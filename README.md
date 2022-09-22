@@ -8,4 +8,3 @@ TCPY 是專為 TOUCHANCE 行情服務用戶提供的 Python 程式交易串接 A
 
 
 
-456

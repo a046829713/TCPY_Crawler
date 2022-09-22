@@ -7,7 +7,8 @@ import threading
 from tcoreapi_mq import QuoteAPI
 import zmq
 import DataProvider
-
+from datetime import datetime
+from datetime import timedelta
 
 class Crawler_Service():
     def __init__(self) -> None:
@@ -43,6 +44,18 @@ class Crawler_Service():
             threading.Thread(target=self.get_historydata, args=(
                 self.g_QuoteSession, symbolname, symbolcode, '1K'), name=f"threading-{symbolname}").start()
 
+    def changestatuscode(self, Symbolsinfo: list):
+        """用來覆寫DB內的狀態碼
+
+        Args:
+            Symbolsinfo (list): [()]
+
+        """
+        # 每次更新DB內的代碼
+        for symbolname, symbolcode, statsucode in Symbolsinfo:
+            self.db.change_db_data(
+                f"update {self.dbtablename} set statuscode = 0 where futuresname = '{symbolname}';")
+
     def get_daydata(self):
         """ 
         用來取得歷史日線資料
@@ -51,7 +64,11 @@ class Crawler_Service():
         self.dbtablename = 'taiwanstockfuturesdaily'
         self.g_QuoteZMQ, self.g_QuoteSession = self.provider.login()
         self.sessions.update({self.g_QuoteSession: "onuse"})
+
         Symbolsinfo = self.db.get_db_data(f"select * from {self.dbtablename}")
+
+        # 更新狀態碼
+        self.changestatuscode(Symbolsinfo)
 
         threads = []
         for symbolname, symbolcode, statsucode in Symbolsinfo:
@@ -116,16 +133,24 @@ class Crawler_Service():
 
         """
         try:
-            # 起始時間
-            StrTim = '2010070100'
-            # 結束時間
-            EndTim = '2022082000'
+            if datatype == 'DK':
+                StrTim = str(self.db.get_db_data(f"select * from `{symbolcode + '.DK'}`;")[-1][0] + timedelta(days= 1))
+                StrTim = StrTim.replace("-","") + "00"
+                EndTim = str((datetime.today() + timedelta(days= -1)).date())
+                EndTim = EndTim.replace("-","") + "00"
+            else:   
+                # 起始時間
+                StrTim = '2010070100'
+                # 結束時間
+                EndTim = '2022082000'
+
+
             # 資料頁數
             QryInd = '0'
 
-            SubHis = self.g_QuoteZMQ.SubHistory(
-                g_QuoteSession, symbolcode, datatype, StrTim, EndTim)
+            SubHis = self.g_QuoteZMQ.SubHistory(g_QuoteSession, symbolcode, datatype, StrTim, EndTim)
 
+            print("訂閱成功:",SubHis)
             if isinstance(SubHis, zmq.error.Again):
                 self.reconnect(g_QuoteSession, symbolname, symbolcode)
                 return
@@ -140,6 +165,7 @@ class Crawler_Service():
                 HisData = self.g_QuoteZMQ.GetHistory(
                     g_QuoteSession, symbolcode, datatype, StrTim, EndTim, QryInd, "1")
 
+                print("取得資料",HisData)
                 if isinstance(HisData, zmq.error.Again):
                     self.reconnect(g_QuoteSession, symbolname, symbolcode)
                     return
@@ -176,8 +202,9 @@ class Crawler_Service():
                     self.reconnect(g_QuoteSession, symbolname, symbolcode)
                     return
 
-                if self.transformer.change_time(HisData['HisData'],datatype) is not None:
-                    chagnedata, QryInd = self.transformer.change_time(HisData['HisData'],datatype)
+                # 改成所需要的資料庫時間
+                if self.transformer.change_time(HisData['HisData'], datatype) is not None:
+                    chagnedata, QryInd = self.transformer.change_time(HisData['HisData'], datatype)
                 else:
                     Debug_tool.debug.record_msg(
                         f"檔案儲存成功,商品名稱:{symbolname},商品代碼:{symbolcode}", logging.info)
@@ -192,8 +219,7 @@ class Crawler_Service():
                     writecode = symbolcode
 
                 if self.db.wirte_data(writecode, chagnedata) is None:
-                    Debug_tool.debug.record_msg(
-                        f"資料寫入成功,線程名稱:{threading.current_thread().name}")
+                    Debug_tool.debug.record_msg(f"資料寫入成功,線程名稱:{threading.current_thread().name}")
                 else:
                     self.sem_thredinglock.release()
                     return
