@@ -72,11 +72,11 @@ class Crawler_Service():
 
         threads = []
         for symbolname, symbolcode, statsucode in Symbolsinfo:
+            print(symbolname, symbolcode, statsucode)
             if statsucode != 0:
                 continue
 
-            Debug_tool.debug.record_msg(
-                f"主要商品:{symbolname},線程名稱:{threading.current_thread().name}")
+            Debug_tool.debug.record_msg(f"主要商品:{symbolname},線程名稱:{threading.current_thread().name}")
             symbolcode = symbolcode.upper()
 
             threads.append(threading.Thread(target=self.get_historydata, args=(
@@ -88,6 +88,8 @@ class Crawler_Service():
 
         for i in range(len(threads)):
             threads[i].join()
+
+        print('更新完成')
 
     def reconnect(self, g_QuoteSession: str, symbolname, symbolcode):
         """斷線重新連接機制

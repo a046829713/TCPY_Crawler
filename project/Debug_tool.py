@@ -2,10 +2,8 @@ import traceback
 import logging
 
 
-import logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s',
                     datefmt='%Y-%m-%d %H:%M', handlers=[logging.FileHandler('my.log', 'w', 'utf-8'), ])
-
 
 class debug():
     @staticmethod
