@@ -70,6 +70,8 @@ class Crawler_Service():
         # 更新狀態碼
         self.changestatuscode(Symbolsinfo)
 
+        # 更新後重新取得
+        Symbolsinfo = self.db.get_db_data(f"select * from {self.dbtablename}")
         threads = []
         for symbolname, symbolcode, statsucode in Symbolsinfo:
             print(symbolname, symbolcode, statsucode)
@@ -83,7 +85,6 @@ class Crawler_Service():
                 self.g_QuoteSession, symbolname, symbolcode, 'DK'), name=f"threading-{symbolname}-{symbolcode}.DK"))
 
         for i in range(len(threads)):
-            self.sem_thredinglock.acquire()
             threads[i].start()
 
         for i in range(len(threads)):
